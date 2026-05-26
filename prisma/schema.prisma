@@ -1,0 +1,206 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Plan {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  priceMonthly Float?
+  maxFamilies  Int
+  maxMembers   Int
+  features     Json
+  tenants      Tenant[]
+}
+
+model Tenant {
+  id               String       @id @default(cuid())
+  name             String
+  slug             String       @unique
+  planId           String
+  plan             Plan         @relation(fields: [planId], references: [id])
+  stripeCustomerId String?
+  billingEmail     String
+  maxFamilies      Int          @default(1)
+  maxMembers       Int          @default(5)
+  chatEnabled      Boolean      @default(false)
+  analyticsEnabled Boolean      @default(false)
+  familiesCount    Int          @default(0)
+  membersCount     Int          @default(0)
+  users            UserTenant[]
+  families         Family[]
+  subscription     Subscription?
+  invoices         Invoice[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model User {
+  id            String           @id @default(cuid())
+  email         String           @unique
+  name          String?
+  image         String?
+  emailVerified DateTime?
+  accounts      Account[]
+  sessions      Session[]
+  tenants       UserTenant[]
+  adminOf       Family[]
+  members       FamilyMember[]
+  weekends      WeekendAssignment[]
+  exchanges     ExchangeRequest[]
+  notifications     Notification[]
+  pushSubscriptions PushSubscription[]
+  createdAt         DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model UserTenant {
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role     String @default("admin")
+
+  @@unique([userId, tenantId])
+}
+
+model Subscription {
+  id                   String   @id @default(cuid())
+  tenantId             String   @unique
+  tenant               Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  stripeSubscriptionId String?
+  status               String
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+}
+
+model Invoice {
+  id              String    @id @default(cuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  stripeInvoiceId String?
+  amount          Float
+  status          String
+  paidAt          DateTime?
+  createdAt       DateTime  @default(now())
+}
+
+model Family {
+  id          String              @id @default(cuid())
+  tenantId    String
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  code        String              @db.Char(6)
+  adminId     String
+  admin       User                @relation(fields: [adminId], references: [id])
+  mamanLabel  String              @default("Maman")
+  papaLabel   String              @default("Papa")
+  zone        String              @default("zone-a")
+  agreement   String              @default("alternance")
+  weekends    WeekendAssignment[]
+  members     FamilyMember[]
+  exchanges   ExchangeRequest[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([tenantId, code])
+}
+
+model FamilyMember {
+  id       String  @id @default(cuid())
+  familyId String
+  family   Family  @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  userId   String?
+  user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  role     String  @default("parent")
+
+  @@unique([familyId, userId])
+}
+
+model WeekendAssignment {
+  id          String   @id @default(cuid())
+  familyId    String
+  family      Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  startDate   DateTime
+  endDate     DateTime
+  owner       String
+  type        String   @default("weekend")
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([familyId, startDate])
+}
+
+model ExchangeRequest {
+  id            String    @id @default(cuid())
+  familyId      String
+  family        Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  requestedById String
+  requestedBy   User      @relation(fields: [requestedById], references: [id])
+  targetDate    DateTime
+  proposedDate  DateTime?
+  reason        String?
+  status        String    @default("pending")
+  createdAt     DateTime  @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
+
