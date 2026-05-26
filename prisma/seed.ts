@@ -14,7 +14,7 @@ async function main() {
       name: "free",
       priceMonthly: 0,
       maxFamilies: 1,
-      maxMembers: 5,
+      maxMembers: 1,
       features: { chat: false, analytics: false },
     },
   });

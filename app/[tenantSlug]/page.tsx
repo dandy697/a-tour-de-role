@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
+import { CopyInviteButton } from "@/components/CopyInviteButton";
 
 export default async function DashboardPage({
   params,
@@ -13,8 +14,14 @@ export default async function DashboardPage({
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+  });
+
+  if (!tenant) redirect("/login");
+
   const families = await prisma.family.findMany({
-    where: { tenant: { slug: tenantSlug } },
+    where: { tenantId: tenant.id },
     include: {
       weekends: {
         where: { startDate: { gte: new Date() } },
@@ -25,6 +32,8 @@ export default async function DashboardPage({
     },
     orderBy: { createdAt: "asc" },
   });
+
+  const canAddFamily = families.length < tenant.maxFamilies;
 
   const upcomingWeekends = await prisma.weekendAssignment.findMany({
     where: {
@@ -45,7 +54,7 @@ export default async function DashboardPage({
             Bonjour, {session.user.name?.split(" ")[0]} 👋
           </p>
         </div>
-        {families.length === 0 && (
+        {families.length === 0 && canAddFamily && (
           <Link
             href={`/${tenantSlug}/onboarding`}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
@@ -82,8 +91,11 @@ export default async function DashboardPage({
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h3 className="font-bold text-lg">{family.name}</h3>
-                    <p className="text-gray-500 text-sm">
-                      Code: <span className="font-mono font-bold">{family.code}</span> ·{" "}
+                    <p className="text-gray-500 text-sm mt-1">
+                      Code: <span className="font-mono font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded">{family.code}</span>
+                      <CopyInviteButton code={family.code} />
+                    </p>
+                    <p className="text-gray-500 text-xs mt-1">
                       {family._count.members} membre{family._count.members !== 1 ? "s" : ""}
                     </p>
                   </div>
@@ -128,12 +140,21 @@ export default async function DashboardPage({
               </div>
             ))}
 
-            <Link
-              href={`/${tenantSlug}/onboarding`}
-              className="block text-center border-2 border-dashed border-gray-200 rounded-2xl p-4 text-sm text-gray-500 hover:border-gray-300 hover:text-gray-700 transition-colors"
-            >
-              + Ajouter une famille
-            </Link>
+            {canAddFamily ? (
+              <Link
+                href={`/${tenantSlug}/onboarding`}
+                className="block text-center border-2 border-dashed border-gray-200 rounded-2xl p-4 text-sm text-gray-500 hover:border-gray-300 hover:text-gray-700 transition-colors"
+              >
+                + Ajouter une famille
+              </Link>
+            ) : (
+              <div className="block text-center border-2 border-dashed border-gray-100 bg-gray-50 rounded-2xl p-4 text-sm text-gray-400">
+                <span className="mb-1 block">🔒 Limite atteinte ({tenant.maxFamilies} famille{tenant.maxFamilies > 1 ? 's' : ''})</span>
+                <Link href={`/${tenantSlug}/settings/billing`} className="text-blue-600 hover:underline">
+                  Passez au plan Pro
+                </Link> pour en ajouter d'autres.
+              </div>
+            )}
           </div>
 
           {/* Upcoming sidebar */}

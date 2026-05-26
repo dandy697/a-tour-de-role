@@ -4,6 +4,7 @@ import { useState } from "react";
 import { getFrenchHolidays } from "@/lib/holidays/french-holidays";
 import { getSchoolHolidays } from "@/lib/holidays/school-holidays";
 import type { Zone } from "@/lib/holidays/school-holidays";
+import { AddVacationModal } from "./AddVacationModal";
 
 interface WeekendData {
   id: string;
@@ -48,6 +49,7 @@ export function CalendarGrid({
 }: CalendarGridProps) {
   const [year, setYear] = useState(initialYear);
   const [month, setMonth] = useState(initialMonth);
+  const [showVacationModal, setShowVacationModal] = useState(false);
 
   const holidays = getFrenchHolidays(year);
   const schoolHols = getSchoolHolidays(year, family.zone as Zone);
@@ -103,6 +105,7 @@ export function CalendarGrid({
   }
 
   return (
+    <>
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b">
@@ -120,6 +123,12 @@ export function CalendarGrid({
           className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
         >
           ›
+        </button>
+        <button
+          onClick={() => setShowVacationModal(true)}
+          className="ml-auto bg-orange-100 text-orange-700 hover:bg-orange-200 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+        >
+          + Vacances
         </button>
       </div>
 
@@ -214,5 +223,14 @@ export function CalendarGrid({
         })}
       </div>
     </div>
+    {showVacationModal && (
+      <AddVacationModal
+        familyId={family.id}
+        mamanLabel={family.mamanLabel}
+        papaLabel={family.papaLabel}
+        onClose={() => setShowVacationModal(false)}
+      />
+    )}
+    </>
   );
 }
